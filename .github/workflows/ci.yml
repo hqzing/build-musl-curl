@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  release:
+    types: [created]
+  push:
+    branches: [ "main" ]
+
+permissions: write-all
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: alpine:3.22
+      volumes:
+        - /tmp/node20:/__e/node20:rw,rshared
+    steps:
+      - name: Setup node for actions/checkout
+        run: |
+          sed -i "/^ID=/s/alpine/skipCheckIt/" /etc/os-release
+          apk add nodejs --update-cache
+          mkdir /__e/node20/bin
+          ln -s /usr/bin/node /__e/node20/bin/node
+      - name: checkout
+        uses: actions/checkout@v4
+      - name: build
+        run: ./build-curl.sh
+      - name: upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          path: "/opt/curl-8.8.0-linux-musl-arm64.tar.gz"
+          compression-level: 0
+          retention-days: 7
+      - name: upload release asset
+        if: github.event_name == 'release'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }} 
+          asset_path: "/opt/curl-8.8.0-linux-musl-arm64.tar.gz"
+          asset_name: "curl-8.8.0-linux-musl-arm64.tar.gz"
+          asset_content_type: application/octet-stream
